@@ -6,7 +6,6 @@ Roger : CLI tool to accelerate the front-end developer's daily tedious tasks.
 Don't you just hate having to open two or three different browser tabs after completing every single ticket ?
 And then waiting for slow interfaces that requires you to click everywhere just to update one field ?
 
----
 
 ## Features
 
@@ -16,7 +15,6 @@ And then waiting for slow interfaces that requires you to click everywhere just 
 
 Works great in a multiple project environment thanks to individual config files.
 
-----
 
 ## Usage
 
@@ -33,6 +31,7 @@ Let's break it down :
 |`roger jenkins`|Runs a jenkins deploy job for your current branch|
 |`roger jenkins JIR-123`|Runs a jenkins deploy job for branch "JIR-123"|
 |`roger jira`|Updates the jira ticket corresponding to the current branch|
+|`roger roger`|Runs all actions in that order : mr, jenkins, jira|
 
 You can supply the arguments in any order.
 
@@ -52,8 +51,6 @@ __Note__ The Jira task updates a custom field with the url of the sandbox url th
 If you need the Jira task to do something else, you'll need to write your own `curl` and refer to Jira's api documentation.
 
 
-----
-
 ## Configuration
 
 When running `roger` for the first time, you will need to fill in your credentials for the various APIs that `roger` uses.
@@ -71,7 +68,6 @@ You can change the variable for  this location at the top of the script.
 __Note__
 If something doesn't work, it might be because the service's API has changed. Check the corresponding documentation.
 
-----
 
 ## Installation
 
@@ -97,8 +93,6 @@ If you want to use it with a different name, try `roger install alias=something`
 It can be useful if you want to include this script in your project's or your team's generic tooling.
 
 
-----
-
 ## Dependencies
 
 ### Curl
@@ -115,7 +109,6 @@ apt install curl jq
 brew install curl jq
 ```
 
-----
 
 ## Contributions
 
