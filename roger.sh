@@ -30,6 +30,7 @@ set_user_config() {
   CONFIG_DIR="${HOME}/.config/roger"
   ALIAS_FILE="${HOME}/.bashrc"
   CLIPBOARD_CMD='xclip'
+  SCRIPT_NAME='roger'
   DEBUG=0 # verbose debug output / += to not override environment variable
 
   ################### END USER CONFIG ##################
@@ -62,15 +63,27 @@ cat << 'EOF'
       jira : updates the corresponding jira ticket
       roger : all of the above, in that order
 
+      Can be combined : `roger jenkins jira`
+
       [branch name (default: current)] [target branch (default: MR_TARGET)] [assignee (default: self)]
 
       help
-        (Displays this)
+        Displays this information
 
-      install : adds alias in your ~/.bashrc
+      install
+        Adds an alias in your ~/.bashrc
         You can change the alias name with the option `--alias=something`
+        You can change the alias destination file in the script.
+
+      uninstall
+        Removes alias from your alias file
+
       autocompletion
-        (Sets up autocompletion for this script. Needs admin rights.)
+        Sets up autocompletion for this script. Needs admin rights.
+
+      debug
+        Must be first argument.
+        Runs the script in debug mode : verbose output and status messages.
 
 
   Dependencies:
@@ -84,8 +97,6 @@ cat << 'EOF'
       macOs: brew install jq
 
 EOF
-
-exit 0
 }
 
 function require_dependencies() {
@@ -516,12 +527,7 @@ function run_mr() {
 ############################################################################################
 
 function roger() {
-  [[ ${1} == 'help' ]] && display_help
-
   ((DEBUG)) && local ENV_DEBUG=1 # store environment variable
-
-  local SCRIPT_NAME='roger'
-  [[ -n ${ROGER_SCRIPT_NAME} ]] && SCRIPT_NAME=${ROGER_SCRIPT_NAME}
 
   [[ ! $(git rev-parse --show-toplevel 2>/dev/null) ]] \
     && echo -e '\n  ERROR:\n  You are not in a git repository.\n\n  Exiting.' \
@@ -531,9 +537,43 @@ function roger() {
   local DEBUG
   local CONFIG_DIR
   local CLIPBOARD_CMD
+  local SCRIPT_NAME
   set_user_config # initialize user config variables
 
+  [[ -n ${ROGER_SCRIPT_NAME} ]] && SCRIPT_NAME=${ROGER_SCRIPT_NAME}
+
   ((ENV_DEBUG)) && DEBUG=1 # override user config with environment variable
+  [[ ${1} == 'DEBUG' ]] && { shift; DEBUG=1; }
+  LOGGER --clear 'Running in debug mode.'
+
+  case ${1} in
+    'help')
+      display_help
+      exit 0
+      ;;
+
+    'install')
+      [[ ${2} =~ '--alias=' ]] && { SCRIPT_NAME=$(echo ${1} | cut --fields=2 --delimiter='=') ; shift ; }
+      echo alias ${SCRIPT_NAME}=\"ROGER_SCRIPT_NAME=${SCRIPT_NAME} ${0}\" >> ${ALIAS_FILE}
+      exit 0
+      ;;
+
+    'uninstall')
+      local SED_OPT='-i""'
+      [[ ${OSTYPE} == 'macos' ]] && SED_OPT='-i ""'
+      sed "${SED_OPT}" '/ROGER_SCRIPT_NAME/d' ${ALIAS_FILE}
+      exit 0
+      ;;
+
+    'autocompletion')
+      local COMPLETION="mr jira jenkins ${MR_PEOPLE} ${MR_TARGET} ${JENKINS_ENVIRONMENTS}"
+      echo -e "complete -W \"${COMPLETION}\" ${SCRIPT_NAME}" > /etc/bash_completion.d/mr.autocompletion.sh \
+        && echo -e '  Autocompletion successfully set !\n  Restart your terminal for this to take effect.' \
+        && exit 0
+      echo '  Autocompletion could not be installed. Are you root ?'
+      exit $(RETURNER 82)
+      ;;
+  esac
 
   # Declare general config variables
   local GITLAB_URL
@@ -587,42 +627,21 @@ function roger() {
 
   while [[ ${#} != 0 ]] ; do
     case ${1} in
-      'debug')   DEBUG=1 ;;
-
       'mr')      ACTION_MR=1 ;;
       'wip')     ACTION_MR=1 ; IS_WIP=1 ;;
       'jenkins') ACTION_JENKINS=1 ;;
       'jira')    ACTION_JIRA=1;;
       'roger')   ACTION_MR=1 ; ACTION_JENKINS=1 ; ACTION_JIRA=1 ;;
 
-      'install')
-        [[ ${2} =~ '--alias=' ]] && { SCRIPT_NAME=$(echo ${1} | cut --fields=2 --delimiter='=') ; shift ; }
-        echo alias ${SCRIPT_NAME}=\"ROGER_SCRIPT_NAME=${SCRIPT_NAME} ${0}\" >> ${ALIAS_FILE}
-        return 0
-        ;;
-      'uninstall')
-        local SED_OPT='-i""'
-        [[ ${OSTYPE} == 'macos' ]] && SED_OPT='-i ""'
-        sed "${SED_OPT}" '/ROGER_SCRIPT_NAME/d' ${ALIAS_FILE}
-        ;;
-      'autocompletion')
-        local COMPLETION="mr jira jenkins ${MR_PEOPLE} ${MR_TARGET} ${JENKINS_ENVIRONMENTS}"
-        echo -e "complete -W \"${COMPLETION}\" ${SCRIPT_NAME}" > /etc/bash_completion.d/mr.autocompletion.sh \
-          && echo -e '  Autocompletion successfully set !\n  Restart your terminal for this to take effect.' \
-          && return 0
-        echo '  Autocompletion could not be installed. Are you root ?'
-        return $(RETURNER 82)
-        ;;
-
       ${PROJECT_PREFIX}-* | ${PROJECT_PREFIX_LC}-*) BRANCH=${1} ;;
       [0-9]*) BRANCH="${PROJECT_PREFIX}-${1}" ;;
 
       *) OPTS+=${1} ;;
     esac
-    shift
-  done
 
-  LOGGER --clear 'Running in debug mode.'
+    shift
+
+  done
 
   if [[ -n ${PROTECTED_BRANCHES} ]] ; then
     [[ ${BRANCH} =~ ${PROTECTED_BRANCHES} ]] && IS_PROTECTED=1
